@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Excel → ClickUp Importer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --purple-50: #EEEDFE;
+    --purple-100: #CECBF6;
+    --purple-200: #AFA9EC;
+    --purple-400: #7F77DD;
+    --purple-600: #534AB7;
+    --purple-800: #3C3489;
+    --purple-900: #26215C;
+    --teal-50: #E1F5EE;
+    --teal-400: #1D9E75;
+    --teal-600: #0F6E56;
+    --teal-800: #085041;
+    --coral-50: #FAECE7;
+    --coral-400: #D85A30;
+    --coral-600: #993C1D;
+    --blue-50: #E6F1FB;
+    --blue-200: #85B7EB;
+    --blue-400: #378ADD;
+    --blue-600: #185FA5;
+    --amber-50: #FAEEDA;
+    --amber-400: #BA7517;
+    --gray-50: #F7F6F4;
+    --gray-100: #EEECEA;
+    --gray-200: #D8D6D0;
+    --gray-400: #9B9990;
+    --gray-600: #5F5E5A;
+    --gray-900: #1C1B19;
+    --bg: #FAFAF8;
+    --surface: #FFFFFF;
+    --border: rgba(0,0,0,0.08);
+    --border-md: rgba(0,0,0,0.13);
+    --text: #1C1B19;
+    --text-2: #5F5E5A;
+    --text-3: #9B9990;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 2.5rem;
+  }
+  .app-logo {
+    width: 44px;
+    height: 44px;
+    background: var(--purple-600);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .app-logo i { font-size: 22px; color: #fff; }
+  .app-header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .app-header p { font-size: 14px; color: var(--text-2); margin-top: 2px; }
+
+  /* Stepper */
+  .stepper {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 20px;
+    box-shadow: var(--shadow);
+  }
+  .stp { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .stp-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1.5px solid var(--border-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--text-3);
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .stp-label { font-size: 13px; color: var(--text-3); font-weight: 400; white-space: nowrap; }
+  .stp.active .stp-num { background: var(--purple-600); color: #fff; border-color: var(--purple-600); }
+  .stp.active .stp-label { color: var(--text); font-weight: 500; }
+  .stp.done .stp-num { background: var(--teal-400); color: #fff; border-color: var(--teal-400); }
+  .stp.done .stp-label { color: var(--text-2); }
+  .stp-sep { flex: none; width: 24px; height: 1px; background: var(--border-md); margin: 0 4px; }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 14px;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border-md);
+    border-radius: var(--radius-lg);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--gray-50);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--purple-400);
+    background: var(--purple-50);
+  }
+  .drop-zone .dz-icon {
+    width: 56px; height: 56px;
+    background: var(--purple-50);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    border: 1px solid var(--purple-100);
+  }
+  .drop-zone .dz-icon i { font-size: 28px; color: var(--purple-600); }
+  .drop-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .drop-zone p { font-size: 13px; color: var(--text-3); }
+  #file-input { display: none; }
+
+  /* Sheet tabs */
+  .sheet-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .sheet-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border-md);
+    font-size: 13px; font-weight: 400;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.12s;
+    user-select: none;
+  }
+  .sheet-tab:hover { background: var(--gray-50); border-color: var(--gray-200); }
+  .sheet-tab.selected {
+    background: var(--purple-50);
+    border-color: var(--purple-200);
+    color: var(--purple-800);
+    font-weight: 500;
+  }
+  .sheet-tab i { font-size: 15px; }
+  .tab-pill {
+    font-size: 11px; font-weight: 500; padding: 2px 7px;
+    border-radius: 20px; background: var(--gray-100); color: var(--gray-600);
+  }
+  .sheet-tab.selected .tab-pill { background: var(--purple-100); color: var(--purple-800); }
+
+  /* Preview info bar */
+  .file-info {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--gray-50);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+  }
+  .file-info i { font-size: 18px; color: var(--purple-600); }
+  .file-info .fname { font-size: 14px; font-weight: 500; flex: 1; }
+  .badge {
+    font-size: 11px; font-weight: 500; padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .badge-purple { background: var(--purple-50); color: var(--purple-800); }
+  .badge-teal { background: var(--teal-50); color: var(--teal-600); }
+  .badge-amber { background: var(--amber-50); color: var(--amber-400); }
+  .badge-blue { background: var(--blue-50); color: var(--blue-600); }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto; max-height: 200px; overflow-y: auto;
+    border-radius: var(--radius); border: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th {
+    background: var(--gray-50); padding: 8px 12px; text-align: left;
+    font-weight: 500; font-size: 12px; color: var(--text-2);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1;
+  }
+  td {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--gray-50); }
+
+  /* Mapping */
+  .map-hdr {
+    display: grid; grid-template-columns: 1fr 28px 1fr; gap: 0 12px;
+    padding-bottom: 8px; margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .map-hdr span { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.05em; }
+  .map-rows { display: flex; flex-direction: column; gap: 8px; }
+  .map-row { display: grid; grid-template-columns: 1fr 28px 1fr; gap: 0 12px; align-items: center; }
+  .map-label {
+    font-size: 13px; padding: 8px 12px;
+    background: var(--gray-50); border-radius: var(--radius);
+    color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid var(--border);
+  }
+  .map-arrow { text-align: center; color: var(--text-3); font-size: 14px; }
+  .map-select select { width: 100%; }
+
+  /* Form */
+  .field-group { margin-bottom: 14px; }
+  .field-group label { font-size: 12px; font-weight: 500; color: var(--text-2); display: block; margin-bottom: 5px; }
+  .field-group input, .field-group select { width: 100%; }
+  input, select {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 9px 12px;
+    border: 1px solid var(--border-md);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--purple-400); box-shadow: 0 0 0 3px var(--purple-50); }
+  input[type="password"] { font-family: 'DM Mono', monospace; font-size: 13px; }
+  .hint { font-size: 12px; color: var(--text-3); margin-top: 5px; }
+  .hint a { color: var(--purple-600); text-decoration: none; font-weight: 500; }
+  .hint a:hover { text-decoration: underline; }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 8px; margin-top: 1.25rem; }
+  .btn-p {
+    background: var(--purple-600); color: #fff;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius); font-size: 14px; font-weight: 500;
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-p:hover { background: var(--purple-800); }
+  .btn-p:active { transform: scale(0.98); }
+  .btn-p:disabled { opacity: 0.4; cursor: default; }
+  .btn-s {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-md);
+    padding: 10px 22px; border-radius: var(--radius);
+    font-size: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .btn-s:hover { background: var(--gray-50); }
+
+  /* Status */
+  .status-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .si {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; padding: 9px 13px;
+    border-radius: var(--radius); border: 1px solid var(--border);
+  }
+  .si.running { color: var(--blue-600); background: var(--blue-50); border-color: var(--blue-200); }
+  .si.success { color: var(--teal-600); background: var(--teal-50); border-color: #9FE1CB; }
+  .si.error { color: var(--coral-600); background: var(--coral-50); border-color: #F5C4B3; }
+  .si i { font-size: 16px; flex-shrink: 0; }
+  .si .sheet-tag {
+    margin-left: auto; font-size: 11px; font-weight: 500;
+    padding: 2px 7px; border-radius: 10px;
+    background: var(--purple-50); color: var(--purple-800); flex-shrink: 0;
+  }
+  .si .task-id { margin-left: 8px; font-size: 11px; color: var(--teal-600); font-family: 'DM Mono', monospace; }
+
+  /* Progress */
+  .prog-wrap { background: var(--gray-100); border-radius: 20px; height: 6px; margin: 8px 0; overflow: hidden; }
+  .prog-bar { height: 100%; background: var(--purple-400); border-radius: 20px; transition: width 0.3s; }
+  .prog-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .prog-meta span { font-size: 13px; color: var(--text-2); }
+  .prog-meta strong { font-size: 13px; font-weight: 600; }
+
+  /* Metrics */
+  .metric-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1.25rem; }
+  .metric { padding: 1rem; border-radius: var(--radius); background: var(--gray-50); text-align: center; border: 1px solid var(--border); }
+  .metric-val { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+  .metric-label { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .metric.ok .metric-val { color: var(--teal-600); }
+  .metric.err .metric-val { color: var(--coral-600); }
+
+  /* Spinner */
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--blue-200); border-top-color: var(--blue-600); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+
+  .tok-status { font-size: 13px; margin-top: 8px; }
+  .sheet-import-tag {
+    font-size: 11px; font-weight: 500; padding: 2px 8px;
+    border-radius: 20px; background: var(--purple-50);
+    color: var(--purple-800); margin-left: 6px;
+  }
+  .card-sheet-hdr {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-sheet-hdr i { font-size: 18px; color: var(--purple-600); }
+  .card-sheet-hdr span { font-size: 15px; font-weight: 500; }
+
+  .preview-label {
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+    margin: 14px 0 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .preview-label strong { color: var(--text); font-weight: 600; }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    .stp-label { display: none; }
+    .stp-sep { width: 12px; }
+    .map-row, .map-hdr { grid-template-columns: 1fr 20px 1fr; gap: 0 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="app-header">
+    <div class="app-logo"><i class="ti ti-table-import"></i></div>
+    <div>
+      <h1>Excel → ClickUp Importer</h1>
+      <p>Upload your workbook, pick sheets, map columns, push tasks.</p>
+    </div>
+  </div>
+
+  <!-- Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="stp active" id="st1"><div class="stp-num">1</div><span class="stp-label">Upload</span></div>
+    <div class="stp-sep"></div>
+    <div class="stp" id="st2"><div class="stp-num">2</div><span class="stp-label">Select sheets</span></div>
+    <div class="stp-sep"></div>
+    <div class="stp" id="st3"><div class="stp-num">3</div><span class="stp-label">Map columns</span></div>
+    <div class="stp-sep"></div>
+    <div class="stp" id="st4"><div class="stp-num">4</div><span class="stp-label">ClickUp</span></div>
+    <div class="stp-sep"></div>
+    <div class="stp" id="st5"><div class="stp-num">5</div><span class="stp-label">Import</span></div>
+  </div>
+
+  <!-- Step 1: Upload -->
+  <div id="p1">
+    <div class="card">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="dz-icon"><i class="ti ti-file-spreadsheet"></i></div>
+        <h3>Click to upload your spreadsheet</h3>
+        <p>or drag & drop here &nbsp;·&nbsp; .xlsx · .xls · .csv</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" />
+    </div>
+  </div>
+
+  <!-- Step 2: Select sheets -->
+  <div id="p2" class="hidden">
+    <div class="card">
+      <div class="file-info" id="file-info">
+        <i class="ti ti-file-filled"></i>
+        <span class="fname" id="fname"></span>
+      </div>
+      <p class="card-title">Select sheets to import</p>
+      <div class="sheet-tabs" id="sheet-tabs"></div>
+      <div id="preview-wrap">
+        <div class="preview-label">Preview — <strong id="preview-sheet-name"></strong></div>
+        <div class="table-wrap" id="preview-tbl"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-s" onclick="goStep(1)"><i class="ti ti-arrow-left"></i> Back</button>
+        <button class="btn-p" id="btn-sheets" onclick="buildMappingPanels();goStep(3);" disabled>Continue <i class="ti ti-arrow-right"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Map columns -->
+  <div id="p3" class="hidden">
+    <div id="mapping-panels"></div>
+    <div class="btn-row">
+      <button class="btn-s" onclick="goStep(2)"><i class="ti ti-arrow-left"></i> Back</button>
+      <button class="btn-p" onclick="goStep(4)">Continue <i class="ti ti-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- Step 4: ClickUp Config -->
+  <div id="p4" class="hidden">
+    <div class="card">
+      <p class="card-title">ClickUp connection</p>
+      <div class="field-group">
+        <label>Personal API token</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="password" id="cu-token" placeholder="pk_xxxxxxxxxx…" style="flex:1;" />
+          <button class="btn-s" onclick="testToken()" id="test-btn">Test</button>
+        </div>
+        <div class="hint">Get yours at <a href="https://app.clickup.com/settings/apps" target="_blank">ClickUp → Settings → Apps ↗</a></div>
+      </div>
+      <div class="field-group hidden" id="ws-grp">
+        <label>Workspace</label>
+        <select id="ws-sel" onchange="loadSpaces()"><option value="">— select workspace —</option></select>
+      </div>
+      <div class="field-group hidden" id="sp-grp">
+        <label>Space</label>
+        <select id="sp-sel" onchange="loadLists()"><option value="">— select space —</option></select>
+      </div>
+      <div class="field-group hidden" id="ls-grp">
+        <label>List (tasks will be created here)</label>
+        <select id="ls-sel"><option value="">— select list —</option></select>
+      </div>
+      <div class="tok-status" id="tok-status"></div>
+      <div class="btn-row">
+        <button class="btn-s" onclick="goStep(3)"><i class="ti ti-arrow-left"></i> Back</button>
+        <button class="btn-p" id="start-btn" onclick="startImport()" disabled>Start import <i class="ti ti-rocket"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Import -->
+  <div id="p5" class="hidden">
+    <div class="card" id="running-card">
+      <p class="card-title">Importing tasks</p>
+      <div class="prog-meta">
+        <span id="prog-label">0 / 0 tasks</span>
+        <strong id="prog-pct">0%</strong>
+      </div>
+      <div class="prog-wrap"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
+      <div class="status-list" id="status-list" style="margin-top:14px;"></div>
+    </div>
+    <div class="card hidden" id="done-card">
+      <p class="card-title">Import complete</p>
+      <div class="metric-grid">
+        <div class="metric ok"><div class="metric-val" id="d-ok">0</div><div class="metric-label">Created</div></div>
+        <div class="metric err"><div class="metric-val" id="d-err">0</div><div class="metric-label">Failed</div></div>
+        <div class="metric"><div class="metric-val" id="d-tot">0</div><div class="metric-label">Total</div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-s" onclick="reset()"><i class="ti ti-refresh"></i> Start over</button>
+        <button class="btn-p" onclick="window.open('https://app.clickup.com','_blank')"><i class="ti ti-external-link"></i> Open ClickUp</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let workbook = null, sheetData = {}, selectedSheets = new Set(), columnMaps = {};
+let cuToken = '', listId = '';
+
+const cuFields = [
+  {v:'',l:'— skip —'},
+  {v:'name',l:'Task name ✱'},
+  {v:'description',l:'Description'},
+  {v:'status',l:'Status'},
+  {v:'priority',l:'Priority'},
+  {v:'due_date',l:'Due date'},
+  {v:'assignees',l:'Assignee (email)'},
+  {v:'tags',l:'Tags'},
+  {v:'time_estimate',l:'Time estimate (hrs)'},
+];
+
+const autoMap = {
+  'name':'name','title':'name','task':'name','task name':'name',
+  'description':'description','desc':'description',
+  'status':'status','priority':'priority',
+  'due date':'due_date','due':'due_date',
+  'assignee':'assignees','assigned to':'assignees',
+  'tags':'tags','tag':'tags','time estimate':'time_estimate'
+};
+
+function goStep(n) {
+  [1,2,3,4,5].forEach(i => {
+    document.getElementById('p'+i).classList.toggle('hidden', i!==n);
+    const t = document.getElementById('st'+i);
+    t.classList.remove('active','done');
+    if(i < n) t.classList.add('done');
+    if(i === n) t.classList.add('active');
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    workbook = XLSX.read(e.target.result, {type:'array', cellDates:true});
+    sheetData = {};
+    selectedSheets = new Set();
+    workbook.SheetNames.forEach(name => {
+      const ws = workbook.Sheets[name];
+      const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const headers = (json[0]||[]).map(String);
+      const rows = json.slice(1).filter(r => r.some(c => c !== ''));
+      sheetData[name] = {headers, rows};
+    });
+    document.getElementById('fname').textContent = file.name;
+    renderSheetTabs();
+    goStep(2);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderSheetTabs() {
+  const container = document.getElementById('sheet-tabs');
+  container.innerHTML = '';
+  workbook.SheetNames.forEach(name => {
+    const {rows} = sheetData[name];
+    const tab = document.createElement('div');
+    tab.className = 'sheet-tab';
+    tab.dataset.sheet = name;
+    tab.innerHTML = `<i class="ti ti-table" aria-hidden="true"></i><span>${esc(name)}</span><span class="tab-pill">${rows.length} rows</span>`;
+    tab.addEventListener('click', () => toggleSheet(name, tab));
+    container.appendChild(tab);
+    if(workbook.SheetNames.length === 1) toggleSheet(name, tab);
+  });
+  if(workbook.SheetNames.length > 0) showPreview(workbook.SheetNames[0]);
+}
+
+function toggleSheet(name, el) {
+  if(selectedSheets.has(name)) {
+    selectedSheets.delete(name);
+    el.classList.remove('selected');
+  } else {
+    selectedSheets.add(name);
+    el.classList.add('selected');
+    showPreview(name);
+  }
+  document.getElementById('btn-sheets').disabled = selectedSheets.size === 0;
+}
+
+function showPreview(name) {
+  document.getElementById('preview-sheet-name').textContent = name;
+  const {headers, rows} = sheetData[name];
+  const preview = rows.slice(0,5);
+  let html = '<table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>';
+  preview.forEach(row => {
+    html += '<tr>'+headers.map((_,i)=>'<td>'+esc(String(row[i]??''))+'</td>').join('')+'</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('preview-tbl').innerHTML = html;
+  document.querySelectorAll('.sheet-tab').forEach(t => {
+    t.style.outline = t.dataset.sheet === name ? '2px solid var(--purple-200)' : '';
+    t.style.outlineOffset = '1px';
+  });
+}
+
+function buildMappingPanels() {
+  const container = document.getElementById('mapping-panels');
+  container.innerHTML = '';
+  columnMaps = {};
+  selectedSheets.forEach(name => {
+    const {headers, rows} = sheetData[name];
+    const map = {};
+    headers.forEach((h,i) => { map[i] = autoMap[h.toLowerCase().trim()] || ''; });
+    columnMaps[name] = map;
+    const panel = document.createElement('div');
+    panel.className = 'card';
+    const rowsHtml = headers.map((h,i) => {
+      const opts = cuFields.map(f=>`<option value="${f.v}" ${f.v===map[i]?'selected':''}>${f.l}</option>`).join('');
+      const safeName = name.replace(/'/g,"\\'");
+      return `<div class="map-row">
+        <div class="map-label" title="${esc(h)}">${esc(h)}</div>
+        <div class="map-arrow"><i class="ti ti-arrow-right" aria-hidden="true"></i></div>
+        <div class="map-select"><select onchange="columnMaps['${safeName}'][${i}]=this.value">${opts}</select></div>
+      </div>`;
+    }).join('');
+    panel.innerHTML = `<div class="card-sheet-hdr">
+      <i class="ti ti-table" aria-hidden="true"></i>
+      <span>${esc(name)}</span>
+      <span class="sheet-import-tag">${rows.length} tasks</span>
+    </div>
+    <div class="map-hdr"><span>YOUR COLUMN</span><span></span><span>CLICKUP FIELD</span></div>
+    <div class="map-rows">${rowsHtml}</div>`;
+    container.appendChild(panel);
+  });
+}
+
+async function testToken() {
+  cuToken = document.getElementById('cu-token').value.trim();
+  if(!cuToken) return;
+  const btn = document.getElementById('test-btn');
+  btn.textContent = 'Testing…'; btn.disabled = true;
+  const st = document.getElementById('tok-status');
+  try {
+    const r = await fetch('https://api.clickup.com/api/v2/team', {headers:{Authorization:cuToken}});
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.err||'Auth failed');
+    const ws = document.getElementById('ws-sel');
+    ws.innerHTML = '<option value="">— select workspace —</option>' +
+      d.teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+    document.getElementById('ws-grp').classList.remove('hidden');
+    st.innerHTML = '<span style="color:var(--teal-600)"><i class="ti ti-circle-check" style="vertical-align:-2px;margin-right:4px;"></i>Connected successfully!</span>';
+  } catch(e) {
+    st.innerHTML = '<span style="color:var(--coral-600)"><i class="ti ti-alert-circle" style="vertical-align:-2px;margin-right:4px;"></i>'+esc(e.message)+'</span>';
+  }
+  btn.textContent = 'Test'; btn.disabled = false;
+}
+
+async function loadSpaces() {
+  const tid = document.getElementById('ws-sel').value;
+  if(!tid) return;
+  ['sp-grp','ls-grp'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('start-btn').disabled = true;
+  try {
+    const r = await fetch(`https://api.clickup.com/api/v2/team/${tid}/space?archived=false`, {headers:{Authorization:cuToken}});
+    const d = await r.json();
+    const sel = document.getElementById('sp-sel');
+    sel.innerHTML = '<option value="">— select space —</option>'+
+      d.spaces.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    document.getElementById('sp-grp').classList.remove('hidden');
+  } catch(e) {}
+}
+
+async function loadLists() {
+  const sid = document.getElementById('sp-sel').value;
+  if(!sid) return;
+  document.getElementById('ls-grp').classList.add('hidden');
+  document.getElementById('start-btn').disabled = true;
+  try {
+    const r = await fetch(`https://api.clickup.com/api/v2/space/${sid}/list?archived=false`, {headers:{Authorization:cuToken}});
+    const d = await r.json();
+    const sel = document.getElementById('ls-sel');
+    sel.innerHTML = '<option value="">— select list —</option>'+
+      d.lists.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+    document.getElementById('ls-grp').classList.remove('hidden');
+    sel.onchange = () => { listId = sel.value; document.getElementById('start-btn').disabled = !listId; };
+  } catch(e) {}
+}
+
+async function startImport() {
+  goStep(5);
+  const allRows = [];
+  selectedSheets.forEach(name => {
+    sheetData[name].rows.forEach(row => allRows.push({row, sheet:name}));
+  });
+  const total = allRows.length;
+  let ok=0, err=0;
+  const sl = document.getElementById('status-list');
+  sl.innerHTML = '';
+
+  for(let ri=0; ri<allRows.length; ri++) {
+    const {row, sheet} = allRows[ri];
+    const map = columnMaps[sheet];
+    const nameIdx = Object.keys(map).find(i => map[i]==='name');
+    const taskName = nameIdx !== undefined ? String(row[nameIdx]??'') : ('Row '+(ri+1));
+    const el = document.createElement('div');
+    el.className = 'si running';
+    el.innerHTML = `<div class="spinner"></div><span>${esc(taskName||'Task '+(ri+1))}</span><span class="sheet-tag">${esc(sheet)}</span>`;
+    sl.appendChild(el);
+    sl.scrollTop = sl.scrollHeight;
+    updateProg(ri, total);
+    try {
+      const body = buildBody(row, map);
+      const r = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
+        method:'POST',
+        headers:{Authorization:cuToken,'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      });
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.err||'API error');
+      ok++;
+      el.className = 'si success';
+      el.innerHTML = `<i class="ti ti-circle-check" aria-hidden="true"></i><span>${esc(taskName||'Task '+(ri+1))}</span><span class="sheet-tag">${esc(sheet)}</span><span class="task-id">#${d.id}</span>`;
+    } catch(e) {
+      err++;
+      el.className = 'si error';
+      el.innerHTML = `<i class="ti ti-alert-circle" aria-hidden="true"></i><span>${esc(taskName||'Task '+(ri+1))}</span><span class="sheet-tag">${esc(sheet)}</span><span style="margin-left:8px;font-size:12px;">${esc(e.message)}</span>`;
+    }
+    await sleep(250);
+  }
+  updateProg(total, total);
+  document.getElementById('d-ok').textContent = ok;
+  document.getElementById('d-err').textContent = err;
+  document.getElementById('d-tot').textContent = total;
+  document.getElementById('done-card').classList.remove('hidden');
+  document.getElementById('running-card').style.opacity = '0.5';
+}
+
+function buildBody(row, map) {
+  const body = {};
+  Object.keys(map).forEach(i => {
+    const f = map[i]; if(!f) return;
+    const val = String(row[i]??'').trim(); if(!val) return;
+    if(f==='name') body.name = val;
+    else if(f==='description') body.description = val;
+    else if(f==='status') body.status = val.toLowerCase();
+    else if(f==='priority') { const p={urgent:1,high:2,normal:3,low:4}; body.priority = p[val.toLowerCase()]||3; }
+    else if(f==='due_date') { const d=new Date(val); if(!isNaN(d)) body.due_date = d.getTime(); }
+    else if(f==='assignees') body.assignees = val.split(',').map(s=>s.trim()).filter(Boolean);
+    else if(f==='tags') body.tags = val.split(',').map(s=>s.trim()).filter(Boolean);
+    else if(f==='time_estimate') { const h=parseFloat(val); if(!isNaN(h)) body.time_estimate = Math.round(h*3600000); }
+  });
+  if(!body.name) body.name = 'Imported task';
+  return body;
+}
+
+function updateProg(done, total) {
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('prog-bar').style.width = pct+'%';
+  document.getElementById('prog-label').textContent = done+' / '+total+' tasks';
+  document.getElementById('prog-pct').textContent = pct+'%';
+}
+
+function reset() {
+  workbook=null; sheetData={}; selectedSheets=new Set(); columnMaps={}; cuToken=''; listId='';
+  document.getElementById('file-input').value='';
+  document.getElementById('done-card').classList.add('hidden');
+  document.getElementById('running-card').style.opacity='1';
+  document.getElementById('tok-status').innerHTML='';
+  ['ws-grp','sp-grp','ls-grp'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('cu-token').value='';
+  document.getElementById('start-btn').disabled=true;
+  goStep(1);
+}
+
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
